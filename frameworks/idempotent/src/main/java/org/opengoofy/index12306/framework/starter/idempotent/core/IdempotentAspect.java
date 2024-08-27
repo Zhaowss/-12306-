@@ -37,13 +37,19 @@ public final class IdempotentAspect {
      */
     @Around("@annotation(org.opengoofy.index12306.framework.starter.idempotent.annotation.Idempotent)")
     public Object idempotentHandler(ProceedingJoinPoint joinPoint) throws Throwable {
+//        首先我们会拿到对应的幂等操作的注解的方法的注解参数
         Idempotent idempotent = getIdempotent(joinPoint);
+//        获取我们的幂等处理器,我们采用的时策略模式,实现高内聚低耦合的操作
+//        可以这样获取的原因是 其已经将其对应的场景和类性的bean 放到我们的容器中了
         IdempotentExecuteHandler instance = IdempotentExecuteHandlerFactory.getInstance(idempotent.scene(), idempotent.type());
         Object resultObj;
         try {
+//            执行幂等的逻辑
             instance.execute(joinPoint, idempotent);
+//            处理中间的业务
             resultObj = joinPoint.proceed();
             instance.postProcessing();
+//            处理幂等的后置逻辑
         } catch (RepeatConsumptionException ex) {
             /**
              * 触发幂等逻辑时可能有两种情况：
@@ -52,13 +58,21 @@ public final class IdempotentAspect {
              */
             if (!ex.getError()) {
                 return null;
+//              此时判断我们的抛出的异常中error是否假
+//                当前的这个逻辑的判断则是判定是否已完成
+//                如果是则返回null,表示不需要进行进一步的处理
             }
+
+//            当我们判断其状态还是处理中的时候:我们需要抛出异常让rocketmq进行重试
             throw ex;
         } catch (Throwable ex) {
-            // 客户端消费存在异常，需要删除幂等标识方便下次 RocketMQ 再次通过重试队列投递
+            // 客户端消费存在异常，需要删幂等标识方便下次 RocketMQ 再次通过重试队列投递
             instance.exceptionProcessing();
+//            当此时的任然还在运行中,就需要进行超时重传了
             throw ex;
+//            此时抛出异常之后会使得消息队列进行重试
         } finally {
+//            清理幂等的上下文容器
             IdempotentContext.clean();
         }
         return resultObj;

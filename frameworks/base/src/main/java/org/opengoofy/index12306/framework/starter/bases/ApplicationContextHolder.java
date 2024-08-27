@@ -27,11 +27,14 @@ import java.util.Map;
 /**
  * Application context holder.
  * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
+ * 实现对应的aware的接口我们就可以拿到对应的springcontext的这个容器的对象
+ * 也就是说我们需要自定义一个字容器，并且持有我们的spring boot的applicationcontext的容器
+ * 这样我们这个子容器就可以再别的地方被调用
  */
 public class ApplicationContextHolder implements ApplicationContextAware {
-
+//springcontexaware的接口被实现就可以拿到当前的spring的容器的实现。
     private static ApplicationContext CONTEXT;
-
+//这样我们就可以通过访问子容器进而实现对当前的spring的context的访问和其中的bean的使用
     @Override
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
         ApplicationContextHolder.CONTEXT = applicationContext;

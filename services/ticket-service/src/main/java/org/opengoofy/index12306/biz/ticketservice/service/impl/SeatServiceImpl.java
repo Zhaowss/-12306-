@@ -108,6 +108,7 @@ public class SeatServiceImpl extends ServiceImpl<SeatMapper, SeatDO> implements 
 
     @Override
     public void lockSeat(String trainId, String departure, String arrival, List<TrainPurchaseTicketRespDTO> trainPurchaseTicketRespList) {
+//        完成系列的操作之后,对当前座位的票的状态进行锁定
         List<RouteDTO> routeList = trainStationService.listTakeoutTrainStationRoute(trainId, departure, arrival);
         trainPurchaseTicketRespList.forEach(each -> routeList.forEach(item -> {
             LambdaUpdateWrapper<SeatDO> updateWrapper = Wrappers.lambdaUpdate(SeatDO.class)
@@ -119,6 +120,7 @@ public class SeatServiceImpl extends ServiceImpl<SeatMapper, SeatDO> implements 
             SeatDO updateSeatDO = SeatDO.builder()
                     .seatStatus(SeatStatusEnum.LOCKED.getCode())
                     .build();
+//            对当前车厢的当前的座位号的座位进行锁定的操作 ,其锁定的状态为修改当前的座位车票的状态的信息
             seatMapper.update(updateSeatDO, updateWrapper);
         }));
     }

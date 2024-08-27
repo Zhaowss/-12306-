@@ -55,6 +55,7 @@ public final class IdempotentContext {
         if (CollUtil.isEmpty(context)) {
             context = Maps.newHashMap();
         }
+//        将对应的键值和锁的信息存在tnreadlocal中
         context.put(key, val);
         putContext(context);
     }
@@ -65,6 +66,7 @@ public final class IdempotentContext {
             threadContext.putAll(context);
             return;
         }
+        CONTEXT.set(context);
         CONTEXT.set(context);
     }
     

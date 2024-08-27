@@ -45,7 +45,10 @@ public final class IdempotentParamExecuteHandler extends AbstractIdempotentExecu
 
     @Override
     protected IdempotentParamWrapper buildWrapper(ProceedingJoinPoint joinPoint) {
+//        构建幂等包装器
+//        通过设置当前的servlet的路径+当前的用户ID,从用户上下文中获取对应的用户的ID以及当前的切入点
         String lockKey = String.format("idempotent:path:%s:currentUserId:%s:md5:%s", getServletPath(), getCurrentUserId(), calcArgsMD5(joinPoint));
+//        幂等
         return IdempotentParamWrapper.builder().lockKey(lockKey).joinPoint(joinPoint).build();
     }
 
@@ -77,22 +80,34 @@ public final class IdempotentParamExecuteHandler extends AbstractIdempotentExecu
 
     @Override
     public void handler(IdempotentParamWrapper wrapper) {
+//        基于参宿的幂等的校验,主要就是通过当前的请求,当前的请求的ID,当前的切点的方法,构建分布式锁
         String lockKey = wrapper.getLockKey();
+//        这个拿到锁,起始拿的是一个对应的字符
         RLock lock = redissonClient.getLock(lockKey);
+//        利用当前的请求构成的参数字符串获取到一个redisson实现分布式锁
         if (!lock.tryLock()) {
+//        如果此时别的请求来了,一定无法获取锁,此时显示操作过快
             throw new ClientException(wrapper.getIdempotent().message());
+//            当当前的线程获取到锁之后进行对应的逻辑的处理工厂中
+//            如果出现其他的线程来对当前的切点进行访问则进行拒绝,抛出异常
         }
+//        将该锁存入到当前线程的Threadlocal中
         IdempotentContext.put(LOCK, lock);
+//        将当前的锁放在对应的线程的thread localmap中,这样做的目的是执行完其操作后将其锁释放
     }
 
     @Override
     public void postProcessing() {
+//        这个在执行完对应的切点的方法之后进行执行,即也就是完成我们的业务代码之后进行对应的锁的释放
+//        将其锁置空
         RLock lock = null;
         try {
             lock = (RLock) IdempotentContext.getKey(LOCK);
+//          此时从幂等上下文进行锁的获取
         } finally {
             if (lock != null) {
                 lock.unlock();
+//                如果获取到了,进行解锁
             }
         }
     }

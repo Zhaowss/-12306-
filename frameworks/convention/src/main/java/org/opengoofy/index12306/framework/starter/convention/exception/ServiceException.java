@@ -43,7 +43,7 @@ public class ServiceException extends AbstractException {
     public ServiceException(String message, Throwable throwable, IErrorCode errorCode) {
         super(Optional.ofNullable(message).orElse(errorCode.message()), throwable, errorCode);
     }
-
+//服务端的异常
     @Override
     public String toString() {
         return "ServiceException{" +

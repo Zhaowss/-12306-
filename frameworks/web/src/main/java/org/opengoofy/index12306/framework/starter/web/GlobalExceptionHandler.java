@@ -40,6 +40,7 @@ import java.util.Optional;
  */
 @Slf4j
 @RestControllerAdvice
+//增加该注解之后可以对全局的异常进行捕获和处理
 public class GlobalExceptionHandler {
 
     /**
@@ -47,8 +48,16 @@ public class GlobalExceptionHandler {
      */
     @SneakyThrows
     @ExceptionHandler(value = MethodArgumentNotValidException.class)
-    public Result validExceptionHandler(HttpServletRequest request, MethodArgumentNotValidException ex) {
+    public Result validExceptionHandler(HttpServletRequest request, MethodArgumentNotValidException ex)
+    {
+        //Spring 框架使用反射机制来调用带有 @ExceptionHandler 注解的方法
+        // 并将异常类型与方法签名进行匹配。框架会自动识别并注入与方法参数类型匹配的对象。
+        // 如果方法参数类型是 HttpServletRequest，Spring 会提供当前的 HttpServletRequest 实例。
+        // 如果方法参数类型是 MethodArgumentNotValidException，Spring 会提供发生的异常实例。
         BindingResult bindingResult = ex.getBindingResult();
+        //当我们使用@valid或者@validated进行验证参数的时候，
+        // 如果不匹配的时候会出现一个异常MethodArgumentNotValidException
+        // 这个异常包含了一个 BindingResult 对象，里面存储了详细的验证错误信息。
         FieldError firstFieldError = CollectionUtil.getFirst(bindingResult.getFieldErrors());
         String exceptionStr = Optional.ofNullable(firstFieldError)
                 .map(FieldError::getDefaultMessage)
@@ -59,11 +68,24 @@ public class GlobalExceptionHandler {
 
     /**
      * 拦截应用内抛出的异常
+     * 三种异常，我们传入其异常的公工父类 AbstarctExecption
      */
     @ExceptionHandler(value = {AbstractException.class})
     public Result abstractException(HttpServletRequest request, AbstractException ex) {
         if (ex.getCause() != null) {
+            //u异常的处理 一般也是链式的设计模型，
+            //即也就是 判断根本异常是否为空，
+            //获取异常的根本的原因
+//  try {
+//  代码可能抛出 IOException
+//} catch (IOException e) {
+//   捕获 IOException 并抛出 RuntimeException，将 IOException 作为原因
+//    throw new RuntimeException("Error processing file", e);
+//}
+// 也就是JAVA的异常的抛出的机制采用异常链条的设计的模式
+//可以记录之前的异常的，方便我们确定异常的发生的根本的原因
             log.error("[{}] {} [ex] {}", request.getMethod(), request.getRequestURL().toString(), ex.toString(), ex.getCause());
+//            ex.toString(), ex.getCause()我们通过日志记录日常发生的根本的信息，附加更加详细的错误日志
             return Results.failure(ex);
         }
         log.error("[{}] {} [ex] {}", request.getMethod(), request.getRequestURL().toString(), ex.toString());
@@ -72,6 +94,9 @@ public class GlobalExceptionHandler {
 
     /**
      * 拦截未捕获异常
+     * 前面的异常都是我们自己定义的异常，即当抛出特定的异常的时候，其会全局捕获进行处理
+     * 但是被捕获的异常还有其他的并不只是有我们的Runtimeexecption的异常信息
+     * 因此我们对其公工的异常类进行捕获，增加一个兜底的方案
      */
     @ExceptionHandler(value = Throwable.class)
     public Result defaultErrorHandler(HttpServletRequest request, Throwable throwable) {

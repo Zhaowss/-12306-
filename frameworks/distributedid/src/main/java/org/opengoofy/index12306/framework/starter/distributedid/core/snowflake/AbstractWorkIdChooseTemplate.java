@@ -48,10 +48,13 @@ public abstract class AbstractWorkIdChooseTemplate {
     public void chooseAndInit() {
         // 模板方法模式: 通过抽象方法获取 WorkId 包装器创建雪花算法
         WorkIdWrapper workIdWrapper = chooseWorkId();
+//        通过lua脚本得到对应的用户的id和当前数据中心的id
         long workId = workIdWrapper.getWorkId();
         long dataCenterId = workIdWrapper.getDataCenterId();
+//        将其传入我们的雪花算法中进行雪花算法的实例化
         Snowflake snowflake = new Snowflake(workId, dataCenterId, isUseSystemClock);
         log.info("Snowflake type: {}, workId: {}, dataCenterId: {}", this.getClass().getSimpleName(), workId, dataCenterId);
         SnowflakeIdUtil.initSnowflake(snowflake);
     }
+//    选择对应的workid进行设备的雪花的算法的初始化的操作
 }

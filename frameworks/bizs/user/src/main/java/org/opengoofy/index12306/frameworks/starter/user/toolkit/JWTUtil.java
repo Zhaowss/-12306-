@@ -57,6 +57,8 @@ public final class JWTUtil {
         customerUserMap.put(USER_ID_KEY, userInfo.getUserId());
         customerUserMap.put(USER_NAME_KEY, userInfo.getUsername());
         customerUserMap.put(REAL_NAME_KEY, userInfo.getRealName());
+        //将userinfo对象中的用户的ID和用户名字和用户的真正的姓名放入映射之中，
+        //这些数值将会被嵌入到JWT中进行保存。
         String jwtToken = Jwts.builder()
                 .signWith(SignatureAlgorithm.HS512, SECRET)
                 .setIssuedAt(new Date())
@@ -64,6 +66,13 @@ public final class JWTUtil {
                 .setSubject(JSON.toJSONString(customerUserMap))
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION * 1000))
                 .compact();
+        //创建一个JWT的令牌，然后设置其签名的算法和签名的密钥
+        //设置当前的发行的时间
+        //设置发行的组织
+        //设置发行的内容主题，主要就是我们的当前这个对象的json字符串
+        //设置过期时间，一般是当前的时间加上延时的时间
+        //最后生成当前的JWT的令牌字符串
+
         return TOKEN_PREFIX + jwtToken;
     }
 
@@ -76,11 +85,16 @@ public final class JWTUtil {
     public static UserInfoDTO parseJwtToken(String jwtToken) {
         if (StringUtils.hasText(jwtToken)) {
             String actualJwtToken = jwtToken.replace(TOKEN_PREFIX, "");
+//            拿到当前正式的JWT
             try {
                 Claims claims = Jwts.parser().setSigningKey(SECRET).parseClaimsJws(actualJwtToken).getBody();
                 Date expiration = claims.getExpiration();
+//                通过密钥拿到当前的claims的对象
+//                然后判断是否过期
                 if (expiration.after(new Date())) {
+//                    如果没有过期则直接返回
                     String subject = claims.getSubject();
+//                    将当前的字符串进行解析，json的格式转换成我们的对象实体
                     return JSON.parseObject(subject, UserInfoDTO.class);
                 }
             } catch (ExpiredJwtException ignored) {

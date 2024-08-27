@@ -77,6 +77,7 @@ public abstract class AbstractTrainPurchaseTicketTemplate implements IPurchaseTi
                 String keySuffix = StrUtil.join("_", trainId, each.getStartStation(), each.getEndStation());
                 stringRedisTemplate.opsForHash().increment(TRAIN_STATION_REMAINING_TICKET + keySuffix, String.valueOf(requestParam.getSeatType()), -actualResult.size());
             });
+//            、分配座位后完成对应缓存的扣减
         }
         return actualResult;
     }

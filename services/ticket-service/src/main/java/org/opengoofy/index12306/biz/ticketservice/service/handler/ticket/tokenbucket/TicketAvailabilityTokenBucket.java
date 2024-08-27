@@ -93,8 +93,10 @@ public final class TicketAvailabilityTokenBucket {
                 () -> trainMapper.selectById(requestParam.getTrainId()),
                 ADVANCE_TICKET_DAY,
                 TimeUnit.DAYS);
+//        拿到车次的信息  车次 类型， 起始和终止站点  一些时间的信息
         List<RouteDTO> routeDTOList = trainStationService
                 .listTrainStationRoute(requestParam.getTrainId(), trainDO.getStartStation(), trainDO.getEndStation());
+//        拿到沿线的车次的站点信息，也就是起始站到终点站之间所有的俩俩组合的站点类型
         StringRedisTemplate stringRedisTemplate = (StringRedisTemplate) distributedCache.getInstance();
         String tokenBucketHashKey = TICKET_AVAILABILITY_TOKEN_BUCKET + requestParam.getTrainId();
         Boolean hasKey = distributedCache.hasKey(tokenBucketHashKey);
@@ -105,16 +107,22 @@ public final class TicketAvailabilityTokenBucket {
             }
             try {
                 Boolean hasKeyTwo = distributedCache.hasKey(tokenBucketHashKey);
+//                双重判定进行优化性能，避免其他线程进入进行一些无效的更新的操作
                 if (!hasKeyTwo) {
+//                    如果任然没有则进行对应的数据的更新的操作
                     List<Integer> seatTypes = VehicleTypeEnum.findSeatTypesByCode(trainDO.getTrainType());
+//                    拿到当前的车次的座位的类型
                     Map<String, String> ticketAvailabilityTokenMap = new HashMap<>();
+//                    定义一个hashmap用于存储当前的用户的一些车次的车票信息
                     for (RouteDTO each : routeDTOList) {
                         List<SeatTypeCountDTO> seatTypeCountDTOList = seatService.listSeatTypeCount(Long.parseLong(requestParam.getTrainId()), each.getStartStation(), each.getEndStation(), seatTypes);
+//                        统计当前的座位的表中的指定的车次,指定的起始和终止站点下,指定的座位类型的车票的数目   这个是从我们的车座的表中进行查询的
                         for (SeatTypeCountDTO eachSeatTypeCountDTO : seatTypeCountDTOList) {
                             String buildCacheKey = StrUtil.join("_", each.getStartStation(), each.getEndStation(), eachSeatTypeCountDTO.getSeatType());
                             ticketAvailabilityTokenMap.put(buildCacheKey, String.valueOf(eachSeatTypeCountDTO.getSeatCount()));
                         }
                     }
+//                    构建的车票的桶
                     stringRedisTemplate.opsForHash().putAll(TICKET_AVAILABILITY_TOKEN_BUCKET + requestParam.getTrainId(), ticketAvailabilityTokenMap);
                 }
             } finally {
@@ -127,9 +135,16 @@ public final class TicketAvailabilityTokenBucket {
             redisScript.setResultType(String.class);
             return redisScript;
         });
+//        使用单例模式完成我们的LUA脚本实列的加载,对于需要通过IO进行创建的,我们可以采用单例池的模式去创建
+//        即也就是加载一次之后将其存储在我们的当前的map中进行保存的实现
+//        下次还需要进行获取的时候我们则直接先去查看当前的池子中是否存在,如果不存在的时候,我们就直接进行
+//        创建,如果存在的之后 直接获取返回即不用重复的创建的获取
+
         Assert.notNull(actual);
+//        判断当前的这个获取的脚本是否为空
         Map<Integer, Long> seatTypeCountMap = requestParam.getPassengers().stream()
                 .collect(Collectors.groupingBy(PurchaseTicketPassengerDetailDTO::getSeatType, Collectors.counting()));
+//        将请求中的参数取出来放入我们的请求的map中,记录需要票的类型及其个数
         JSONArray seatTypeCountArray = seatTypeCountMap.entrySet().stream()
                 .map(entry -> {
                     JSONObject jsonObject = new JSONObject();
@@ -140,7 +155,15 @@ public final class TicketAvailabilityTokenBucket {
                 .collect(Collectors.toCollection(JSONArray::new));
         List<RouteDTO> takeoutRouteDTOList = trainStationService
                 .listTakeoutTrainStationRoute(requestParam.getTrainId(), requestParam.getDeparture(), requestParam.getArrival());
+//        构建该此的列车在从出发站点到终止站点的所有的车次的起至站点的信息（起点-终点的所有的信息）
         String luaScriptKey = StrUtil.join("_", requestParam.getDeparture(), requestParam.getArrival());
+
+        /**stringRedisTemplate.execute用于执行我们线程获取令牌的命令
+         *
+         *
+         *
+         *
+         */
         String resultStr = stringRedisTemplate.execute(actual, Lists.newArrayList(tokenBucketHashKey, luaScriptKey), JSON.toJSONString(seatTypeCountArray), JSON.toJSONString(takeoutRouteDTOList));
         TokenResultDTO result = JSON.parseObject(resultStr, TokenResultDTO.class);
         return result == null

@@ -62,13 +62,18 @@ public class SeatMarginCacheLoader {
     public Map<String, String> load(String trainId, String seatType, String departure, String arrival) {
         Map<String, Map<String, String>> trainStationRemainingTicketMaps = new LinkedHashMap<>();
         String keySuffix = CacheUtil.buildKey(trainId, departure, arrival);
+//        构建一个列车ID+起始站点+终止站点的前缀字符串
+
         // 缓存带来的分布式互斥锁还有哪些优化项？详情查看：https://nageoffer.com/12306/question
         RLock lock = redissonClient.getLock(String.format(LOCK_SAFE_LOAD_SEAT_MARGIN_GET, keySuffix));
         lock.lock();
         try {
             StringRedisTemplate stringRedisTemplate = (StringRedisTemplate) distributedCache.getInstance();
+//            去查询当前存在的位次的信息，即也就是去查看当前的实际的保有量的（不同档次的）车票的信息
             Object quantityObj = stringRedisTemplate.opsForHash().get(TRAIN_STATION_REMAINING_TICKET + keySuffix, seatType);
+//            从缓存中获取对应的车次的对应车票类型的车票
             if (CacheUtil.isNullOrBlank(quantityObj)) {
+//                判断如果当前的起始点下的当前车次缓存查询结果为空则进行数据的跟新加载
                 TrainDO trainDO = distributedCache.safeGet(
                         TRAIN_INFO + trainId,
                         TrainDO.class,
@@ -76,17 +81,24 @@ public class SeatMarginCacheLoader {
                         ADVANCE_TICKET_DAY,
                         TimeUnit.DAYS
                 );
+//              先查询到当前的车次的列车实体
                 List<RouteDTO> routeDTOList = trainStationService.listTrainStationRoute(trainId, trainDO.getStartStation(), trainDO.getEndStation());
+//                确定除当前的车次的起始点下所有的站点信息
                 if (CollUtil.isNotEmpty(routeDTOList)) {
                     switch (trainDO.getTrainType()) {
                         // TODO 通过已有列车类型座位枚举重构
+//确定出当前的列车的类型，进行对应的票的查询
                         case 0 -> {
+//                            遍历每每一条陆上车站点信息,及也就是 遍历处理这个车次所有站点之间的车票信息
                             for (RouteDTO each : routeDTOList) {
                                 Map<String, String> trainStationRemainingTicket = new LinkedHashMap<>();
+//                                根据车次 类型 起始站 终止站 确定当前的车票的信息
                                 trainStationRemainingTicket.put("0", selectSeatMargin(trainId, 0, each.getStartStation(), each.getEndStation()));
                                 trainStationRemainingTicket.put("1", selectSeatMargin(trainId, 1, each.getStartStation(), each.getEndStation()));
                                 trainStationRemainingTicket.put("2", selectSeatMargin(trainId, 2, each.getStartStation(), each.getEndStation()));
                                 String actualKeySuffix = CacheUtil.buildKey(trainId, each.getStartStation(), each.getEndStation());
+//                                将其按照车票的类型，将其存入哈希表中，及也就是存储三个不同类型的哈希表，
+//                                以车票的类型为key 对应的数量为value
                                 trainStationRemainingTicketMaps.put(TRAIN_STATION_REMAINING_TICKET + actualKeySuffix, trainStationRemainingTicket);
                             }
                         }
@@ -121,6 +133,7 @@ public class SeatMarginCacheLoader {
                 }
                 // TODO LUA 脚本执行
                 trainStationRemainingTicketMaps.forEach((cacheKey, cacheMap) -> stringRedisTemplate.opsForHash().putAll(cacheKey, cacheMap));
+//                最后将其存入我们的redis中
             }
         } finally {
             lock.unlock();

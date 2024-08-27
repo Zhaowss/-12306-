@@ -83,12 +83,14 @@ public class DelayCloseOrderConsumer implements RocketMQListener<MessageWrapper<
     )
     @Override
     public void onMessage(MessageWrapper<DelayCloseOrderEvent> delayCloseOrderEventMessageWrapper) {
+//        延时关闭订单的操作
         log.info("[延迟关闭订单] 开始消费：{}", JSON.toJSONString(delayCloseOrderEventMessageWrapper));
         DelayCloseOrderEvent delayCloseOrderEvent = delayCloseOrderEventMessageWrapper.getMessage();
         String orderSn = delayCloseOrderEvent.getOrderSn();
         Result<Boolean> closedTickOrder;
         try {
             closedTickOrder = ticketOrderRemoteService.closeTickOrder(new CancelTicketOrderReqDTO(orderSn));
+//            远程调用车票服务进行当前车票订单的取消
         } catch (Throwable ex) {
             log.error("[延迟关闭订单] 订单号：{} 远程调用订单服务失败", orderSn, ex);
             throw ex;
@@ -104,15 +106,20 @@ public class DelayCloseOrderConsumer implements RocketMQListener<MessageWrapper<
             List<TrainPurchaseTicketRespDTO> trainPurchaseTicketResults = delayCloseOrderEvent.getTrainPurchaseTicketResults();
             try {
                 seatService.unlock(trainId, departure, arrival, trainPurchaseTicketResults);
+//                拿到当前的延迟消息的订单信息,然后对其进行解锁的操作,也就是恢复到当前的状态
+//                会对沿途的所有同类型的座位进行锁定
             } catch (Throwable ex) {
                 log.error("[延迟关闭订单] 订单号：{} 回滚列车DB座位状态失败", orderSn, ex);
                 throw ex;
             }
+//            对当前锁定的座位进行解锁的操作
             try {
                 StringRedisTemplate stringRedisTemplate = (StringRedisTemplate) distributedCache.getInstance();
                 Map<Integer, List<TrainPurchaseTicketRespDTO>> seatTypeMap = trainPurchaseTicketResults.stream()
                         .collect(Collectors.groupingBy(TrainPurchaseTicketRespDTO::getSeatType));
+//             按照座位的类型进行分类
                 List<RouteDTO> routeDTOList = trainStationService.listTakeoutTrainStationRoute(trainId, departure, arrival);
+//              找到沿途的需要进行扣减缓存的车站信息(当前这个站点的信息回滚之后需要扣减对应当前的这个支线上所有的站点之间的票的缓存信息都需进行回滚)
                 routeDTOList.forEach(each -> {
                     String keySuffix = StrUtil.join("_", trainId, each.getStartStation(), each.getEndStation());
                     seatTypeMap.forEach((seatType, trainPurchaseTicketRespDTOList) -> {
@@ -120,9 +127,11 @@ public class DelayCloseOrderConsumer implements RocketMQListener<MessageWrapper<
                                 .increment(TRAIN_STATION_REMAINING_TICKET + keySuffix, String.valueOf(seatType), trainPurchaseTicketRespDTOList.size());
                     });
                 });
+
                 TicketOrderDetailRespDTO ticketOrderDetail = BeanUtil.convert(delayCloseOrderEvent, TicketOrderDetailRespDTO.class);
                 ticketOrderDetail.setPassengerDetails(BeanUtil.convert(delayCloseOrderEvent.getTrainPurchaseTicketResults(), TicketOrderPassengerDetailRespDTO.class));
                 ticketAvailabilityTokenBucket.rollbackInBucket(ticketOrderDetail);
+//                我们用于消峰的令牌桶的方式来进行
             } catch (Throwable ex) {
                 log.error("[延迟关闭订单] 订单号：{} 回滚列车Cache余票失败", orderSn, ex);
                 throw ex;

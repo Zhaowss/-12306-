@@ -16,16 +16,15 @@
  */
 
 package org.opengoofy.index12306.framework.starter.database.handler;
-
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import org.apache.ibatis.reflection.MetaObject;
 import org.opengoofy.index12306.framework.starter.common.enums.DelEnum;
-
 import java.util.Date;
 
 /**
  * 元数据处理器
  * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
+ * 方便我们在数据进行更新和修改的时候对我们的数据进行指定的实体的属性=赋值
  */
 public class MyMetaObjectHandler implements MetaObjectHandler {
 

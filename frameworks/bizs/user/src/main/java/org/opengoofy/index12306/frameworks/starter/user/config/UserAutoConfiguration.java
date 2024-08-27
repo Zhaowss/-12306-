@@ -33,12 +33,17 @@ public class UserAutoConfiguration {
 
     /**
      * 用户信息传递过滤器
+     * 注册一个自定义的servlet的过滤器
      */
     @Bean
     public FilterRegistrationBean<UserTransmitFilter> globalUserTransmitFilter() {
+//       创建一个过滤器注册的实列bean
         FilterRegistrationBean<UserTransmitFilter> registration = new FilterRegistrationBean<>();
+//        传入我们的Filter
         registration.setFilter(new UserTransmitFilter());
+//        设置拦截匹配
         registration.addUrlPatterns("/*");
+//        设置过过滤器的优先级
         registration.setOrder(USER_TRANSMIT_FILTER_ORDER);
         return registration;
     }

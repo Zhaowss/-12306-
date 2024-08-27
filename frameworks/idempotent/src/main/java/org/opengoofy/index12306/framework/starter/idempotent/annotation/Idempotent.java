@@ -67,5 +67,6 @@ public @interface Idempotent {
      * 设置防重令牌 Key 过期时间，单位秒，默认 1 小时，MQ 幂等去重可选设置
      * {@link IdempotentSceneEnum#MQ} and {@link IdempotentTypeEnum#SPEL} 时生效
      */
+     //    设置的房重复的提交的过期时间的设置
     long keyTimeout() default 3600L;
 }

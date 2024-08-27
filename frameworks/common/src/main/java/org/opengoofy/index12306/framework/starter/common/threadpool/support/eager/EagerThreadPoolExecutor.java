@@ -57,6 +57,7 @@ public class EagerThreadPoolExecutor extends ThreadPoolExecutor {
         try {
             super.execute(command);
         } catch (RejectedExecutionException ex) {
+//            拿到父类的方法种的对应的消息的队列
             TaskQueue taskQueue = (TaskQueue) super.getQueue();
             try {
                 if (!taskQueue.retryOffer(command, 0, TimeUnit.MILLISECONDS)) {

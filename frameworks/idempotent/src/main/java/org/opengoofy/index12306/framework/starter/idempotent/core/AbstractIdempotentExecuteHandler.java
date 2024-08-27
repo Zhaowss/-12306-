@@ -43,6 +43,7 @@ public abstract class AbstractIdempotentExecuteHandler implements IdempotentExec
     public void execute(ProceedingJoinPoint joinPoint, Idempotent idempotent) {
         // 模板方法模式：构建幂等参数包装器
         IdempotentParamWrapper idempotentParamWrapper = buildWrapper(joinPoint).setIdempotent(idempotent);
+//      对应的这个handler的方法传入是我们的当前的这个注解的id
         handler(idempotentParamWrapper);
     }
 }

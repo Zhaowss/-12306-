@@ -32,6 +32,8 @@ import java.util.stream.Collectors;
 /**
  * 抽象责任链上下文
  * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
+ * 当我们的springcontext启动的时候进行对应的启动的操作
+ * 实现该接口即可实现对应的功能
  */
 public final class AbstractChainContext<T> implements CommandLineRunner {
 
@@ -51,8 +53,15 @@ public final class AbstractChainContext<T> implements CommandLineRunner {
         abstractChainHandlers.forEach(each -> each.handler(requestParam));
     }
 
+//    当我们的spring的容器启动的时候
+//    此时就会进行对应的初始化的操作，
+//    即扫描所有实现对应的接口的方法，将其加载到我们的对应的hashmaqp中进行保存】
+//
+
     @Override
     public void run(String... args) throws Exception {
+        //特别注意我们在拿到springcontex的容器初始化完成的事件之后，定义了一个子容器持有我们的cobtext的容器
+        //       因此我们可以获取到当前的容器中所有继承抽象方法的对象
         Map<String, AbstractChainHandler> chainFilterMap = ApplicationContextHolder
                 .getBeansOfType(AbstractChainHandler.class);
         chainFilterMap.forEach((beanName, bean) -> {
@@ -64,6 +73,7 @@ public final class AbstractChainContext<T> implements CommandLineRunner {
             List<AbstractChainHandler> actualAbstractChainHandlers = abstractChainHandlers.stream()
                     .sorted(Comparator.comparing(Ordered::getOrder))
                     .collect(Collectors.toList());
+            //此处的mark主要用来进行分组的设计
             abstractChainHandlerContainer.put(bean.mark(), actualAbstractChainHandlers);
         });
     }

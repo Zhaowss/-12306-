@@ -68,16 +68,28 @@ public class TrainTicketQueryParamVerifyChainFilter implements TrainTicketQueryC
                 QUERY_ALL_REGION_LIST,
                 ListUtil.toList(requestParam.getFromStation(), requestParam.getToStation())
         );
+//        此处从缓存中查询并且返回这个起始地址的名称列表
         long emptyCount = actualExistList.stream().filter(Objects::isNull).count();
+//        判断当前的出发地和起始地的地址是否存在
+//        如果当前的记录为0说明我们此时的起始车站和终止的车站都是存在的，直接返回即可
         if (emptyCount == 0L) {
             return;
         }
+//        如果只有单个站点，
+//        或者说在redis中查询当前的这个起始车站都不存在的情况下
+//        加载过一次之后仍然为空存在一个标记查询的的记录
+//        也就是当flag为真表示已经查过数据库，此时要是还是为空则抛出异常
         if (emptyCount == 1L || (emptyCount == 2L && CACHE_DATA_ISNULL_AND_LOAD_FLAG && distributedCache.hasKey(QUERY_ALL_REGION_LIST))) {
             throw new ClientException("出发地或目的地不存在");
         }
+        // 如果FLAG=false代表有可能缓存没有数据，但数据库可能有，此时向下查询数据库
+        // 为了避免缓存击穿，所以这里是用了分布式锁
         RLock lock = redissonClient.getLock(LOCK_QUERY_ALL_REGION_LIST);
         lock.lock();
         try {
+//            双重判定锁，即也就是拿到对应的分布式的锁之后继续向下去判断缓存是否存在
+//            如果缓存存在则直接返回结果
+//            如果缓存不存在则直接继续向下查询数据库
             if (distributedCache.hasKey(QUERY_ALL_REGION_LIST)) {
                 actualExistList = hashOperations.multiGet(
                         QUERY_ALL_REGION_LIST,
@@ -89,6 +101,7 @@ public class TrainTicketQueryParamVerifyChainFilter implements TrainTicketQueryC
                 }
                 return;
             }
+
             List<RegionDO> regionDOList = regionMapper.selectList(Wrappers.emptyWrapper());
             List<StationDO> stationDOList = stationMapper.selectList(Wrappers.emptyWrapper());
             HashMap<Object, Object> regionValueMap = Maps.newHashMap();

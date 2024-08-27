@@ -25,6 +25,7 @@ import java.util.function.Supplier;
 
 /**
  * 单例对象容器
+ * 方便多次的调用，相当于一个缓存的额操作，下次需要这个对象的时候，直接去对应的容器中获取
  * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)

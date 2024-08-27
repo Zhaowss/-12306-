@@ -44,7 +44,9 @@ import java.util.concurrent.TimeUnit;
 /**
  * 分布式缓存之操作 Redis 模版代理
  * 底层通过 {@link RedissonClient}、{@link StringRedisTemplate} 完成外观接口行为
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
+ * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料】
+ * 使用静态代理的方式实现一个加强后的redission 的加强bean
+ *
  */
 @RequiredArgsConstructor
 public class StringRedisTemplateProxy implements DistributedCache {
@@ -72,13 +74,19 @@ public class StringRedisTemplateProxy implements DistributedCache {
 
     @Override
     public Boolean putIfAllAbsent(@NotNull Collection<String> keys) {
+//        从单例池中获取，如果不存在则将该对象创建后加入到当前的单例池的缓存池及也就是hashmap中
+//        通过这中操作我们可以只需要加载一次lua脚本，而后获取直接在单例池中获取即可
+//        此方法可以使得我们不用反复的进行IO加载对应的LUau的脚本。继而提高效率
         DefaultRedisScript<Boolean> actual = Singleton.get(LUA_PUT_IF_ALL_ABSENT_SCRIPT_PATH, () -> {
             DefaultRedisScript redisScript = new DefaultRedisScript();
             redisScript.setScriptSource(new ResourceScriptSource(new ClassPathResource(LUA_PUT_IF_ALL_ABSENT_SCRIPT_PATH)));
             redisScript.setResultType(Boolean.class);
             return redisScript;
         });
+//        执行脚本，并且传入键值的key 和过期时间，并且返回结果
         Boolean result = stringRedisTemplate.execute(actual, Lists.newArrayList(keys), redisProperties.getValueTimeout().toString());
+//        代码是执行，判断所有的键值是否存在，如果有一个存在直接返回空
+//        如果都不存在则将其进行保存并且设置对应的过期的时间
         return result != null && result;
     }
 
@@ -146,12 +154,15 @@ public class StringRedisTemplateProxy implements DistributedCache {
     public <T> T safeGet(String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout, TimeUnit timeUnit,
                          RBloomFilter<String> bloomFilter, CacheGetFilter<String> cacheGetFilter, CacheGetIfAbsent<String> cacheGetIfAbsent) {
         T result = get(key, clazz);
-        // 缓存结果不等于空或空字符串直接返回；通过函数判断是否返回空，为了适配布隆过滤器无法删除的场景；两者都不成立，判断布隆过滤器是否存在，不存在返回空
+        // 缓存结果不等于空或空字符串直接返回；通过函数判断是否返回空，
+        // 为了适配布隆过滤器无法删除的场景；两者都不成立，判断布隆过滤器是否存在，不存在返回空
         if (!CacheUtil.isNullOrBlank(result)
                 || Optional.ofNullable(cacheGetFilter).map(each -> each.filter(key)).orElse(false)
                 || Optional.ofNullable(bloomFilter).map(each -> !each.contains(key)).orElse(false)) {
             return result;
         }
+//       获取安全的分布式锁，其前缀为我们的安全的分布式锁的前缀+key 其中key为当前的用户查询的redis的key，保证锁的唯一性
+
         RLock lock = redissonClient.getLock(SAFE_GET_DISTRIBUTED_LOCK_KEY_PREFIX + key);
         lock.lock();
         try {
@@ -209,7 +220,9 @@ public class StringRedisTemplateProxy implements DistributedCache {
 
     private <T> T loadAndSet(String key, CacheLoader<T> cacheLoader, long timeout, TimeUnit timeUnit, boolean safeFlag, RBloomFilter<String> bloomFilter) {
         T result = cacheLoader.load();
+//        通过这起始就是在查询我们的数据库并且将其结果返回
         if (CacheUtil.isNullOrBlank(result)) {
+//            如果结果不为空直接返回
             return result;
         }
         if (safeFlag) {

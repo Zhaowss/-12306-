@@ -18,7 +18,6 @@
 package org.opengoofy.index12306.framework.starter.designpattern.chain;
 
 import org.springframework.core.Ordered;
-
 /**
  * 抽象业务责任链组件
  * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
@@ -36,4 +35,8 @@ public interface AbstractChainHandler<T> extends Ordered {
      * @return 责任链组件标识
      */
     String mark();
+
+
+//    这个接口有俩个重要方法，分别为haddler 的方法和我们的分组的标记
+//    次外我们继承对应的order的接口去实现对应的排序的功能
 }

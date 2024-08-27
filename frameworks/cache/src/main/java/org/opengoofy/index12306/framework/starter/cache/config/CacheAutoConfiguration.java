@@ -53,7 +53,9 @@ public class CacheAutoConfiguration {
     @Bean
     @ConditionalOnProperty(prefix = BloomFilterPenetrateProperties.PREFIX, name = "enabled", havingValue = "true")
     public RBloomFilter<String> cachePenetrationBloomFilter(RedissonClient redissonClient, BloomFilterPenetrateProperties bloomFilterPenetrateProperties) {
+//        通过redission去获取到对应的一个不论过滤器，去实现后面的缓存穿透的问题
         RBloomFilter<String> cachePenetrationBloomFilter = redissonClient.getBloomFilter(bloomFilterPenetrateProperties.getName());
+//       完成一个初始化的操作。设置了对应的一些步论过滤器的设置
         cachePenetrationBloomFilter.tryInit(bloomFilterPenetrateProperties.getExpectedInsertions(), bloomFilterPenetrateProperties.getFalseProbability());
         return cachePenetrationBloomFilter;
     }

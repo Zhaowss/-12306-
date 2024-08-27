@@ -57,19 +57,28 @@ public final class IdempotentTokenExecuteHandler extends AbstractIdempotentExecu
     public String createToken() {
         String token = Optional.ofNullable(Strings.emptyToNull(idempotentProperties.getPrefix())).orElse(TOKEN_PREFIX_KEY) + UUID.randomUUID();
         distributedCache.put(token, "", Optional.ofNullable(idempotentProperties.getTimeout()).orElse(TOKEN_EXPIRED_TIME));
+//        创建一个对应的Token的设置
         return token;
     }
 
     @Override
     public void handler(IdempotentParamWrapper wrapper) {
         HttpServletRequest request = ((ServletRequestAttributes) (RequestContextHolder.currentRequestAttributes())).getRequest();
+//        拿到对应的请求
         String token = request.getHeader(TOKEN_KEY);
+//        从请求头中获取到对应的token
         if (StrUtil.isBlank(token)) {
+//            如果请求中的token为空
             token = request.getParameter(TOKEN_KEY);
+//            从请求的参数中获取token
             if (StrUtil.isBlank(token)) {
+//                如果没有抛出异常
                 throw new ClientException(BaseErrorCode.IDEMPOTENT_TOKEN_NULL_ERROR);
             }
         }
+//        定义一个token的删除的标志
+//        也就是拿到对应的token之后就将其删除,此时如果再来对应的操作的时候,此时就可以判断缓存中部是否
+//        存在当前的这个token,如果不存在则说明已经被操作过,则可以直接抛出对应的异常
         Boolean tokenDelFlag = distributedCache.delete(token);
         if (!tokenDelFlag) {
             String errMsg = StrUtil.isNotBlank(wrapper.getIdempotent().message())

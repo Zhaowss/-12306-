@@ -28,7 +28,7 @@ import org.opengoofy.index12306.framework.starter.idempotent.enums.IdempotentTyp
 
 /**
  * 幂等参数包装
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
+ * 该类为幂等参数的包装类
  */
 @Data
 @Builder
@@ -43,7 +43,7 @@ public final class IdempotentParamWrapper {
     private Idempotent idempotent;
 
     /**
-     * AOP 处理连接点
+     * AOP 处理连接点，幂等处理的链接点的信息
      */
     private ProceedingJoinPoint joinPoint;
 

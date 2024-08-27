@@ -43,6 +43,9 @@ public class OrderCommonTableComplexAlgorithm implements ComplexKeysShardingAlgo
 
     @Override
     public Collection<String> doSharding(Collection availableTargetNames, ComplexKeysShardingValue shardingValue) {
+//       订单表的分片的算法
+//        Collection availableTargetNames 可以使用的分片的数据表的名称的集合
+//        ComplexKeysShardingValue shardingValue   这是一个包含复杂分片键的对象，通常是用于分片逻辑判断的数据。这个对象会包含分片所需的值（例如，分片键、分片条件等）
         Map<String, Collection<Comparable<?>>> columnNameAndShardingValuesMap = shardingValue.getColumnNameAndShardingValuesMap();
         Collection<String> result = new LinkedHashSet<>(availableTargetNames.size());
         if (CollUtil.isNotEmpty(columnNameAndShardingValuesMap)) {

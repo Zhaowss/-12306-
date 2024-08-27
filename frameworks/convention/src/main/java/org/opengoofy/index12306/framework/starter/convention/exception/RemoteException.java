@@ -37,6 +37,7 @@ public class RemoteException extends AbstractException {
     public RemoteException(String message, Throwable throwable, IErrorCode errorCode) {
         super(message, throwable, errorCode);
     }
+//    远程的服务的异常的问题
 
     @Override
     public String toString() {

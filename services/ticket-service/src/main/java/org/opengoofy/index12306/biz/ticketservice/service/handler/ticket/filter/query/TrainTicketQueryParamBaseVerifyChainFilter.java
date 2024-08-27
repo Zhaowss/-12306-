@@ -33,6 +33,8 @@ import java.util.Objects;
 @Component
 @RequiredArgsConstructor
 public class TrainTicketQueryParamBaseVerifyChainFilter implements TrainTicketQueryChainFilter<TicketPageQueryReqDTO> {
+// 校验车票的车发日期是否是合理的
+//    出发和目的地不能相同
 
     @Override
     public void handler(TicketPageQueryReqDTO requestParam) {

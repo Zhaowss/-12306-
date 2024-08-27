@@ -40,17 +40,17 @@ public class WebAutoConfiguration {
     public GlobalExceptionHandler globalExceptionHandler() {
         return new GlobalExceptionHandler();
     }
-
+//全局的异常处理器的注册，判断当前容器中是否存在异常处理其如果没有则进行new
     @Bean
     public InitializeDispatcherServletController initializeDispatcherServletController() {
         return new InitializeDispatcherServletController();
     }
-
+//初始化一个dispictcherservlet,用于请求的分发和下达
     @Bean
     public RestTemplate simpleRestTemplate(ClientHttpRequestFactory factory) {
         return new RestTemplate(factory);
     }
-
+// RestTemplate(factory); 这个可以通过REst的来进行HTTP请求的发起
     @Bean
     public ClientHttpRequestFactory simpleClientHttpRequestFactory() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -63,4 +63,5 @@ public class WebAutoConfiguration {
     public InitializeDispatcherServletHandler initializeDispatcherServletHandler(RestTemplate simpleRestTemplate, ConfigurableEnvironment configurableEnvironment) {
         return new InitializeDispatcherServletHandler(simpleRestTemplate, configurableEnvironment);
     }
+
 }

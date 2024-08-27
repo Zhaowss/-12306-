@@ -49,13 +49,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class PayResultCallbackOrderConsumer implements RocketMQListener<MessageWrapper<PayResultCallbackOrderEvent>> {
 
     private final OrderService orderService;
-
+//    此处用与支付订单之后进行监听我们的消息队列完成订单的状态的反转
     @Idempotent(
             uniqueKeyPrefix = "index12306-order:pay_result_callback:",
-            key = "#message.getKeys()+'_'+#message.hashCode()",
-            type = IdempotentTypeEnum.SPEL,
-            scene = IdempotentSceneEnum.MQ,
-            keyTimeout = 7200L
+            key = "#message.getKeys()+'_'+#message.hashCode()",//spel ,使其可以动态的获取keY,避免出现锁的重复
+            type = IdempotentTypeEnum.SPEL,//指定当前的模式为spel
+            scene = IdempotentSceneEnum.MQ,//重复消费场景为我们的mq的消息的队列
+            keyTimeout = 7200L  //设置对应的过期的时间
     )
     @Transactional(rollbackFor = Exception.class)
     @Override
@@ -66,7 +66,9 @@ public class PayResultCallbackOrderConsumer implements RocketMQListener<MessageW
                 .orderStatus(OrderStatusEnum.ALREADY_PAID.getStatus())
                 .orderItemStatus(OrderItemStatusEnum.ALREADY_PAID.getStatus())
                 .build();
+//        请求封装到指定的请求的类中进行保存的处理
         orderService.statusReversal(orderStatusReversalDTO);
+//        修改订单相关表中的状态的信息
         orderService.payCallbackOrder(payResultCallbackOrderEvent);
     }
 }

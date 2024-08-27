@@ -77,9 +77,12 @@ public class PayServiceImpl implements PayService {
         if (cacheResult != null) {
             return cacheResult;
         }
+        //如果redis中存在当前的订单请求
+        //直接返回
         /**
          * {@link AliPayNativeHandler}
          */
+
         // 策略模式：通过策略模式封装支付渠道和支付场景，用户支付时动态选择对应的支付组件
         PayResponse result = abstractStrategyChoose.chooseAndExecuteResp(requestParam.buildMark(), requestParam);
         PayDO insertPay = BeanUtil.convert(requestParam, PayDO.class);
@@ -87,6 +90,7 @@ public class PayServiceImpl implements PayService {
         insertPay.setPaySn(paySn);
         insertPay.setStatus(TradeStatusEnum.WAIT_BUYER_PAY.tradeCode());
         insertPay.setTotalAmount(requestParam.getTotalAmount().multiply(new BigDecimal("100")).setScale(0, BigDecimal.ROUND_HALF_UP).intValue());
+        //此处将单位由元转成分，即也就是乘以100 这样的话相当于把之前的小数部分的计算转换成整数，这样计算的误差更小
         int insert = payMapper.insert(insertPay);
         if (insert <= 0) {
             log.error("支付单创建失败，支付聚合根：{}", JSON.toJSONString(requestParam));
@@ -113,13 +117,16 @@ public class PayServiceImpl implements PayService {
         LambdaUpdateWrapper<PayDO> updateWrapper = Wrappers.lambdaUpdate(PayDO.class)
                 .eq(PayDO::getOrderSn, requestParam.getOrderSn());
         int result = payMapper.update(payDO, updateWrapper);
+        //这一步完成在之后标志着当前的数据被更新，也就是支付已经成功
         if (result <= 0) {
             log.error("修改支付单支付结果失败，支付单信息：{}", JSON.toJSONString(payDO));
             throw new ServiceException("修改支付单支付结果失败");
         }
-        // 交易成功，回调订单服务告知支付结果，修改订单流转状态
+        // 交易成功，支付宝的服务就会回调订单服务告知支付结果，此时我们需要发送消息到消息队列中进行订单状态处理
         if (Objects.equals(requestParam.getStatus(), TradeStatusEnum.TRADE_SUCCESS.tradeCode())) {
             payResultCallbackOrderSendProduce.sendMessage(BeanUtil.convert(payDO, PayResultCallbackOrderEvent.class));
+//        向我们的中间件的消息队列发送对应的回调订单的服务
+//            修改订单的一些状态
         }
     }
 

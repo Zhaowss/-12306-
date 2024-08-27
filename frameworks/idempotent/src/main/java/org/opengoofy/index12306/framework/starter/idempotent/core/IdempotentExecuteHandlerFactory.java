@@ -42,10 +42,17 @@ public final class IdempotentExecuteHandlerFactory {
      * @return 幂等执行处理器
      */
     public static IdempotentExecuteHandler getInstance(IdempotentSceneEnum scene, IdempotentTypeEnum type) {
+//        scan字段主要时针对幂等设计的场景:
+//        是接口的防重复提交还是我们的消息队列的防重复消费
         IdempotentExecuteHandler result = null;
         switch (scene) {
+//            重复请求的幂等设计
             case RESTAPI -> {
                 switch (type) {
+//                    幂等的类型
+//                    根据我们自定义的容器取获取即可
+//                    直接可以拿到对应类型的验证bean
+
                     case PARAM -> result = ApplicationContextHolder.getBean(IdempotentParamService.class);
                     case TOKEN -> result = ApplicationContextHolder.getBean(IdempotentTokenService.class);
                     case SPEL -> result = ApplicationContextHolder.getBean(IdempotentSpELByRestAPIExecuteHandler.class);
@@ -53,6 +60,7 @@ public final class IdempotentExecuteHandlerFactory {
                     }
                 }
             }
+//            MQ的幂等设计
             case MQ -> result = ApplicationContextHolder.getBean(IdempotentSpELByMQExecuteHandler.class);
             default -> {
             }

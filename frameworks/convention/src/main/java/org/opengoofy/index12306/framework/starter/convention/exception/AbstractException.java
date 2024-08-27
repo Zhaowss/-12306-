@@ -32,6 +32,9 @@ import java.util.Optional;
  */
 @Getter
 public abstract class AbstractException extends RuntimeException {
+    //存在三大异常
+    //客户端异常，服务端异常，远程服务调用异常 均属于 RuntimeException
+    //因此可以将其共有的抽取成一个抽象方法；AbstractException
 
     public final String errorCode;
 

@@ -56,6 +56,8 @@ public class LocalRedisWorkIdChoose extends AbstractWorkIdChooseTemplate impleme
         }
         return CollUtil.isNotEmpty(luaResultList) ? new WorkIdWrapper(luaResultList.get(0), luaResultList.get(1)) : new RandomWorkIdChoose().chooseWorkId();
     }
+//    判断当前的包含我们lua脚本运行的结果是不是控的，如果是的话将其包装后进行返回，如果不是则直接将其返回一个对应的随机的id
+//    WorkIdWrapper这个里面主要包含两个id,分别是一个为当前的用户的id,一个为当前的数据中心的id
 
     @Override
     public void afterPropertiesSet() throws Exception {

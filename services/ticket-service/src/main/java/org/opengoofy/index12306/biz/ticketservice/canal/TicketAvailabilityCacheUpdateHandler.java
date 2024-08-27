@@ -63,6 +63,7 @@ public class TicketAvailabilityCacheUpdateHandler implements AbstractExecuteStra
         if (CollUtil.isEmpty(messageDataList) || CollUtil.isEmpty(actualOldDataList)) {
             return;
         }
+//        对数据进行过滤的操作,只关注当前的车座的类型的变化
         Map<String, Map<Integer, Integer>> cacheChangeKeyMap = new HashMap<>();
         for (int i = 0; i < messageDataList.size(); i++) {
             Map<String, Object> each = messageDataList.get(i);

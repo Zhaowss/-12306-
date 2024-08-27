@@ -59,6 +59,7 @@ public class TicketController {
 
     /**
      * 购买车票
+     * //     type = IdempotentTypeEnum.TOKEN
      */
     @ILog
     @Idempotent(

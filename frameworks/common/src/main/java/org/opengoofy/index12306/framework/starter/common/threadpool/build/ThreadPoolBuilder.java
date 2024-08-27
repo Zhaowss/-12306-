@@ -34,26 +34,30 @@ import java.util.concurrent.TimeUnit;
  */
 public final class ThreadPoolBuilder implements Builder<ThreadPoolExecutor> {
 
+//核心线程的数目
     private int corePoolSize = calculateCoreNum();
-
+//最大线程的数目
     private int maximumPoolSize = corePoolSize + (corePoolSize >> 1);
-
+//救急线程的存活的时间
     private long keepAliveTime = 30000L;
-
+//时间的单位
     private TimeUnit timeUnit = TimeUnit.MILLISECONDS;
-
+//阻塞队列
     private BlockingQueue workQueue = new LinkedBlockingQueue(4096);
-
+//拒绝的策略
     private RejectedExecutionHandler rejectedExecutionHandler = new ThreadPoolExecutor.AbortPolicy();
 
     private boolean isDaemon = false;
 
     private String threadNamePrefix;
 
+//线程工厂-
     private ThreadFactory threadFactory;
 
     private Integer calculateCoreNum() {
+//        当前的JVM的进程中的可用的核心的数目
         int cpuCoreNum = Runtime.getRuntime().availableProcessors();
+//        根据当前的JVM的进程的核心线程数目去确定除我们的当前的最大的和心线程数
         return new BigDecimal(cpuCoreNum).divide(new BigDecimal("0.2")).intValue();
     }
 

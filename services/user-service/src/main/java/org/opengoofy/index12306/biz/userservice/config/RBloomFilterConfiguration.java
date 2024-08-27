@@ -38,6 +38,7 @@ public class RBloomFilterConfiguration {
     public RBloomFilter<String> userRegisterCachePenetrationBloomFilter(RedissonClient redissonClient, UserRegisterBloomFilterProperties userRegisterBloomFilterProperties) {
         RBloomFilter<String> cachePenetrationBloomFilter = redissonClient.getBloomFilter(userRegisterBloomFilterProperties.getName());
         cachePenetrationBloomFilter.tryInit(userRegisterBloomFilterProperties.getExpectedInsertions(), userRegisterBloomFilterProperties.getFalseProbability());
+//        由redissoon进行布隆过滤器的获取并且放入容器中进行管理
         return cachePenetrationBloomFilter;
     }
 }

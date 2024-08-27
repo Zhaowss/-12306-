@@ -91,6 +91,7 @@ public final class TrainSeatTypeSelector {
                 actualResult.addAll(aggregationResult);
             });
         }
+//        为其分配对应的座位
         if (CollUtil.isEmpty(actualResult) || !Objects.equals(actualResult.size(), passengerDetails.size())) {
             throw new ServiceException("站点余票不足，请尝试更换座位类型或选择其它站点");
         }
@@ -99,6 +100,7 @@ public final class TrainSeatTypeSelector {
                 .collect(Collectors.toList());
         Result<List<PassengerRespDTO>> passengerRemoteResult;
         List<PassengerRespDTO> passengerRemoteResultList;
+//        前面根据一系列的判定条件之后,成功选择对应的车票进行分配给抢票的人,并且完成了对应的缓存的更新的操作
         try {
             passengerRemoteResult = userRemoteService.listPassengerQueryByIds(UserContext.getUsername(), passengerIds);
             if (!passengerRemoteResult.isSuccess() || CollUtil.isEmpty(passengerRemoteResultList = passengerRemoteResult.getData())) {
@@ -112,6 +114,7 @@ public final class TrainSeatTypeSelector {
             }
             throw ex;
         }
+//
         actualResult.forEach(each -> {
             String passengerId = each.getPassengerId();
             passengerRemoteResultList.stream()

@@ -46,6 +46,8 @@ public final class IdempotentSpELByRestAPIExecuteHandler extends AbstractIdempot
     @Override
     protected IdempotentParamWrapper buildWrapper(ProceedingJoinPoint joinPoint) {
         Idempotent idempotent = IdempotentAspect.getIdempotent(joinPoint);
+//        拿到切点对应上面的注解
+//        通过spel实现的是key的动态的变化,就可避免死锁的出现
         String key = (String) SpELUtil.parseKey(idempotent.key(), ((MethodSignature) joinPoint.getSignature()).getMethod(), joinPoint.getArgs());
         return IdempotentParamWrapper.builder().lockKey(key).joinPoint(joinPoint).build();
     }

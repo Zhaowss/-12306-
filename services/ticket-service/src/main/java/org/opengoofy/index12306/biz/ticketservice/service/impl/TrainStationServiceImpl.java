@@ -52,12 +52,15 @@ public class TrainStationServiceImpl implements TrainStationService {
 
     @Override
     public List<RouteDTO> listTrainStationRoute(String trainId, String departure, String arrival) {
+
         LambdaQueryWrapper<TrainStationDO> queryWrapper = Wrappers.lambdaQuery(TrainStationDO.class)
                 .eq(TrainStationDO::getTrainId, trainId)
                 .select(TrainStationDO::getDeparture);
         List<TrainStationDO> trainStationDOList = trainStationMapper.selectList(queryWrapper);
         List<String> trainStationAllList = trainStationDOList.stream().map(TrainStationDO::getDeparture).collect(Collectors.toList());
-        return StationCalculateUtil.throughStation(trainStationAllList, departure, arrival);
+//        拿到当前车次的所有的站点的信息并放入对应的trainstationAlllist的列表中进行存放
+        return StationCalculateUtil.takeoutStation(trainStationAllList, departure, arrival);
+//
     }
 
     @Override

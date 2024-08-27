@@ -14,7 +14,7 @@ local workId = tonumber(redis.call('hget', hashKey, workIdKey))
 local max = 31
 local resultWorkId = 0
 local resultDataCenterId = 0
-
+-- 当其达到最大的设备数目和最大的用户的id的时候，重新修改为0，继续从零开始
 if (dataCenterId == max and workId == max) then
     redis.call('hset', hashKey, dataCenterIdKey, '0')
     redis.call('hset', hashKey, workIdKey, '0')

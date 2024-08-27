@@ -26,6 +26,7 @@ import org.opengoofy.index12306.framework.starter.convention.errorcode.IErrorCod
  */
 public class ClientException extends AbstractException {
 
+//    客户端异常的构造方法
     public ClientException(IErrorCode errorCode) {
         this(null, null, errorCode);
     }

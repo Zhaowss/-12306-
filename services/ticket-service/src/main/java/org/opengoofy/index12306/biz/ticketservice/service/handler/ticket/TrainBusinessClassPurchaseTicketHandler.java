@@ -69,16 +69,25 @@ public class TrainBusinessClassPurchaseTicketHandler extends AbstractTrainPurcha
 
     @Override
     protected List<TrainPurchaseTicketRespDTO> selectSeats(SelectSeatDTO requestParam) {
+//        进行座位的分配
+//        完成分配之后才实现座位的轩则
+//        下面先把请求中的参数都抽离出来进行保存到制定的参数中
         String trainId = requestParam.getRequestParam().getTrainId();
         String departure = requestParam.getRequestParam().getDeparture();
         String arrival = requestParam.getRequestParam().getArrival();
+//        列车的ID 起始站点信息 用户的购票的详情
         List<PurchaseTicketPassengerDetailDTO> passengerSeatDetails = requestParam.getPassengerSeatDetails();
+//        查询座位的服务.确定当前的车票的一个实际的空闲的车厢ID,查询座位的表,并且将其根据车厢号进行分类
         List<String> trainCarriageList = seatService.listUsableCarriageNumber(trainId, requestParam.getSeatType(), departure, arrival);
+//        根据前面查询得到的当前的列车的ID,以及当前座位的类型,起始站和终点站的信息确定除当前的所有有空闲余票的车厢
         List<Integer> trainStationCarriageRemainingTicket = seatService.listSeatRemainingTicket(trainId, departure, arrival, trainCarriageList);
+//        根据前面查询道德车厢的信息,找到当前这些车厢的余票的个数
         int remainingTicketSum = trainStationCarriageRemainingTicket.stream().mapToInt(Integer::intValue).sum();
+//        如果说当前的余票的个数小于当前的用户购票的个数,那么则抛出对应的异常
         if (remainingTicketSum < passengerSeatDetails.size()) {
             throw new ServiceException("站点余票不足，请尝试更换座位类型或选择其它站点");
         }
+//        如果用户的购票数目小于3的时候
         if (passengerSeatDetails.size() < 3) {
             if (CollUtil.isNotEmpty(requestParam.getRequestParam().getChooseSeats())) {
                 Pair<List<TrainPurchaseTicketRespDTO>, Boolean> actualSeatPair = findMatchSeats(requestParam, trainCarriageList, trainStationCarriageRemainingTicket);

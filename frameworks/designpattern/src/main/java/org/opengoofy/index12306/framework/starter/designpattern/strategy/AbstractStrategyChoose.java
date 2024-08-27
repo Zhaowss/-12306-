@@ -97,6 +97,11 @@ public class AbstractStrategyChoose implements ApplicationListener<ApplicationIn
         return (RESPONSE) executeStrategy.executeResp(requestParam);
     }
 
+
+
+//    监听到我们的spring启动的初始化的事件之后
+//    进行对应的策略模式的工厂的设设计。也就是完成对应的bean的扫描并将其放入对应策略，模式的工厂中的map中进行存放
+//    同样 我们依然采用的是通过getmark的方法进行放入，继而完成对应的分分组的设计，容纳多种不同的业务实现的策略模式
     @Override
     public void onApplicationEvent(ApplicationInitializingEvent event) {
         Map<String, AbstractExecuteStrategy> actual = ApplicationContextHolder.getBeansOfType(AbstractExecuteStrategy.class);

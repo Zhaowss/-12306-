@@ -28,7 +28,9 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class TrainTicketQueryParamNotNullChainFilter implements TrainTicketQueryChainFilter<TicketPageQueryReqDTO> {
-
+//其出发地不能为空
+//    其目的地不能为空
+//    其出发的日期不能为空
     @Override
     public void handler(TicketPageQueryReqDTO requestParam) {
         if (StrUtil.isBlank(requestParam.getFromStation())) {

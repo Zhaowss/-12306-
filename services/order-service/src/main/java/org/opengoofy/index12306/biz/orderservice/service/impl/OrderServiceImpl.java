@@ -121,7 +121,9 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public String createTicketOrder(TicketOrderCreateReqDTO requestParam) {
         // 通过基因法将用户 ID 融入到订单号
+        //生成的订单的ID为 时间戳+当前请求巴德尔
         String orderSn = OrderIdGeneratorManager.generateId(requestParam.getUserId());
+
         OrderDO orderDO = OrderDO.builder().orderSn(orderSn)
                 .orderTime(requestParam.getOrderTime())
                 .departure(requestParam.getDeparture())
@@ -136,10 +138,13 @@ public class OrderServiceImpl implements OrderService {
                 .username(requestParam.getUsername())
                 .userId(String.valueOf(requestParam.getUserId()))
                 .build();
+//        将对应的信息插入到我们的订单表中
         orderMapper.insert(orderDO);
         List<TicketOrderItemCreateReqDTO> ticketOrderItems = requestParam.getTicketOrderItems();
         List<OrderItemDO> orderItemDOList = new ArrayList<>();
+//       订单的明细实体 OrderItemDO
         List<OrderItemPassengerDO> orderPassengerRelationDOList = new ArrayList<>();
+//       乘车人和订单关系实体
         ticketOrderItems.forEach(each -> {
             OrderItemDO orderItemDO = OrderItemDO.builder()
                     .trainId(requestParam.getTrainId())
@@ -157,15 +162,20 @@ public class OrderServiceImpl implements OrderService {
                     .status(0)
                     .build();
             orderItemDOList.add(orderItemDO);
+//            得到订单的详细的明细
             OrderItemPassengerDO orderPassengerRelationDO = OrderItemPassengerDO.builder()
                     .idType(each.getIdType())
                     .idCard(each.getIdCard())
                     .orderSn(orderSn)
                     .build();
             orderPassengerRelationDOList.add(orderPassengerRelationDO);
+            //            开始构建订单和乘车人关系实体
         });
+//        乘车人的业务关系表
         orderItemService.saveBatch(orderItemDOList);
+//        乘车人订单关系表
         orderPassengerRelationService.saveBatch(orderPassengerRelationDOList);
+//        将其结果保存入库
         try {
             // 发送 RocketMQ 延时消息，指定时间后取消订单
             DelayCloseOrderEvent delayCloseOrderEvent = DelayCloseOrderEvent.builder()
@@ -177,6 +187,7 @@ public class OrderServiceImpl implements OrderService {
                     .build();
             // 创建订单并支付后延时关闭订单消息怎么办？详情查看：https://nageoffer.com/12306/question
             SendResult sendResult = delayCloseOrderSendProduce.sendMessage(delayCloseOrderEvent);
+            log.info("延时消息已投递:{}",sendResult);
             if (!Objects.equals(sendResult.getSendStatus(), SendStatus.SEND_OK)) {
                 throw new ServiceException("投递延迟关闭订单消息队列失败");
             }
@@ -209,13 +220,17 @@ public class OrderServiceImpl implements OrderService {
         LambdaQueryWrapper<OrderDO> queryWrapper = Wrappers.lambdaQuery(OrderDO.class)
                 .eq(OrderDO::getOrderSn, orderSn);
         OrderDO orderDO = orderMapper.selectOne(queryWrapper);
+//        查询到的订单为空
         if (orderDO == null) {
             throw new ServiceException(OrderCanalErrorCodeEnum.ORDER_CANAL_UNKNOWN_ERROR);
         } else if (orderDO.getStatus() != OrderStatusEnum.PENDING_PAYMENT.getStatus()) {
+//            查询的订单不是等待支付的状态不的时候
             throw new ServiceException(OrderCanalErrorCodeEnum.ORDER_CANAL_STATUS_ERROR);
         }
+//          拿到一个对应的分布式的锁
         RLock lock = redissonClient.getLock(StrBuilder.create("order:canal:order_sn_").append(orderSn).toString());
         if (!lock.tryLock()) {
+//            当并法的线程拿锁失败的时候,进行对应的异常的抛出,抛出重复取消订单异常
             throw new ClientException(OrderCanalErrorCodeEnum.ORDER_CANAL_REPETITION_ERROR);
         }
         try {
@@ -223,10 +238,13 @@ public class OrderServiceImpl implements OrderService {
             updateOrderDO.setStatus(OrderStatusEnum.CLOSED.getStatus());
             LambdaUpdateWrapper<OrderDO> updateWrapper = Wrappers.lambdaUpdate(OrderDO.class)
                     .eq(OrderDO::getOrderSn, orderSn);
+//            查询到当前的订单,并且将当前的订单的状态设置为关闭订单的状态
             int updateResult = orderMapper.update(updateOrderDO, updateWrapper);
+//            记录当前更新的数据的条数
             if (updateResult <= 0) {
                 throw new ServiceException(OrderCanalErrorCodeEnum.ORDER_CANAL_ERROR);
             }
+//    开始修改当前的订单的详情表的该条的消息的状态,将其修改为关闭状态
             OrderItemDO updateOrderItemDO = new OrderItemDO();
             updateOrderItemDO.setStatus(OrderItemStatusEnum.CLOSED.getStatus());
             LambdaUpdateWrapper<OrderItemDO> updateItemWrapper = Wrappers.lambdaUpdate(OrderItemDO.class)
@@ -236,6 +254,7 @@ public class OrderServiceImpl implements OrderService {
                 throw new ServiceException(OrderCanalErrorCodeEnum.ORDER_CANAL_ERROR);
             }
         } finally {
+//            修改订单表和订单的=详情表之后 释放锁,完成订单的状态的修改
             lock.unlock();
         }
         return true;

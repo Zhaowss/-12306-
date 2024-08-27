@@ -85,9 +85,13 @@ public final class StationCalculateUtil {
         return takeoutStationList;
     }
 
+//    考虑两中情况
+//    起始站点在当前站点之前
+//    在起始站点和终止站点之间的情况
+
     public static void main(String[] args) {
         List<String> stations = Arrays.asList("北京南", "济南西", "南京南", "杭州东", "宁波");
-        String startStation = "北京南";
+        String startStation = "济南西";
         String endStation = "南京南";
         StationCalculateUtil.takeoutStation(stations, startStation, endStation).forEach(System.out::println);
     }

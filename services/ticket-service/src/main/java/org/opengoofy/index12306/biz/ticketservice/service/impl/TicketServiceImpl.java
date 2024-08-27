@@ -138,7 +138,9 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
     private final TrainStationRelationMapper trainStationRelationMapper;
     private final TrainStationPriceMapper trainStationPriceMapper;
     private final DistributedCache distributedCache;
+//    车票订单的远程服务
     private final TicketOrderRemoteService ticketOrderRemoteService;
+//    支付订单的远程服务
     private final PayRemoteService payRemoteService;
     private final StationMapper stationMapper;
     private final SeatService seatService;
@@ -167,8 +169,11 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
         // v1 版本存在严重的性能深渊问题，v2 版本完美的解决了该问题。通过 Jmeter 压测聚合报告得知，性能提升在 300% - 500%+
         List<Object> stationDetails = stringRedisTemplate.opsForHash()
                 .multiGet(REGION_TRAIN_STATION_MAPPING, Lists.newArrayList(requestParam.getFromStation(), requestParam.getToStation()));
+//        获取城市和站点的映射的关系，根据起始的站点信息拿到对应的具体城市的信息
         long count = stationDetails.stream().filter(Objects::isNull).count();
+//        同样判断缓存中是否存在，如果当前缓存中不存在则取查询数据库
         if (count > 0) {
+//            拿到对应的锁
             RLock lock = redissonClient.getLock(LOCK_REGION_TRAIN_STATION_MAPPING);
             lock.lock();
             try {
@@ -188,10 +193,15 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
                 lock.unlock();
             }
         }
+
+//       当传入的是起始站点和终止站点的信息的时候，通过映射表的信息拿到对应起始城市和终止城市的信息， 列车的详细情况的查询
         List<TicketListDTO> seatResults = new ArrayList<>();
+//        座位的列表定义一个
         String buildRegionTrainStationHashKey = String.format(REGION_TRAIN_STATION, stationDetails.get(0), stationDetails.get(1));
+//       定义一个新的键值对，即也就是初始城市和终止终止的哈希表
         Map<Object, Object> regionTrainStationAllMap = stringRedisTemplate.opsForHash().entries(buildRegionTrainStationHashKey);
         if (MapUtil.isEmpty(regionTrainStationAllMap)) {
+//            如果此时这个哈希表为空
             RLock lock = redissonClient.getLock(LOCK_REGION_TRAIN_STATION);
             lock.lock();
             try {
@@ -200,7 +210,10 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
                     LambdaQueryWrapper<TrainStationRelationDO> queryWrapper = Wrappers.lambdaQuery(TrainStationRelationDO.class)
                             .eq(TrainStationRelationDO::getStartRegion, stationDetails.get(0))
                             .eq(TrainStationRelationDO::getEndRegion, stationDetails.get(1));
+//                    查询和我们的起始和终止站点相关的所有的车的信息（根据起始和终止的城市去匹配和查询检索）
+//                    查询的是列车站点关系表(进而我们检索出来所有的和当前的起始和终止站点相关v的所有的列车信息)
                     List<TrainStationRelationDO> trainStationRelationList = trainStationRelationMapper.selectList(queryWrapper);
+//                   数据库中查询到对应的起始和终止城市之间的所有的车次的信息。
                     for (TrainStationRelationDO each : trainStationRelationList) {
                         TrainDO trainDO = distributedCache.safeGet(
                                 TRAIN_INFO + each.getTrainId(),
@@ -208,6 +221,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
                                 () -> trainMapper.selectById(each.getTrainId()),
                                 ADVANCE_TICKET_DAY,
                                 TimeUnit.DAYS);
+//                        从缓存中获取列车的信息，先从缓冲中进行查询看是否存在，如果不存在进行获取分布式锁从数据库中获取，并且设置过期时间
                         TicketListDTO result = new TicketListDTO();
                         result.setTrainId(String.valueOf(trainDO.getId()));
                         result.setTrainNumber(trainDO.getTrainNumber());
@@ -236,11 +250,18 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
                 lock.unlock();
             }
         }
+//        此时得到所有的 从 北京到杭州的所有的车次的信息是一个列表，然后每一个实体属于一个列车的信息
         seatResults = CollUtil.isEmpty(seatResults)
                 ? regionTrainStationAllMap.values().stream().map(each -> JSON.parseObject(each.toString(), TicketListDTO.class)).toList()
                 : seatResults;
+//      根据时间进行排序的操作
         seatResults = seatResults.stream().sorted(new TimeStringComparator()).toList();
+
+//        获得所有的起始站点和终止站点相同的车次列表吧之后
+//        遍历每一个车次的集合进行查询
         for (TicketListDTO each : seatResults) {
+//            缓存中查找当前的车次的车票的价格信息
+//            如果不存在则通过缓存加载器进行数据的加载到对应的缓存中返回结果
             String trainStationPriceStr = distributedCache.safeGet(
                     String.format(TRAIN_STATION_PRICE, each.getTrainId(), each.getDeparture(), each.getArrival()),
                     String.class,
@@ -249,28 +270,39 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
                                 .eq(TrainStationPriceDO::getDeparture, each.getDeparture())
                                 .eq(TrainStationPriceDO::getArrival, each.getArrival())
                                 .eq(TrainStationPriceDO::getTrainId, each.getTrainId());
+//                        起始栈+终点站+当前车次确定唯一的车次的实体，并得到列车站点的价格实体
                         return JSON.toJSONString(trainStationPriceMapper.selectList(trainStationPriceQueryWrapper));
                     },
                     ADVANCE_TICKET_DAY,
                     TimeUnit.DAYS
             );
+//
             List<TrainStationPriceDO> trainStationPriceDOList = JSON.parseArray(trainStationPriceStr, TrainStationPriceDO.class);
             List<SeatClassDTO> seatClassList = new ArrayList<>();
             trainStationPriceDOList.forEach(item -> {
+//                车站车票的价格实体
                 String seatType = String.valueOf(item.getSeatType());
+//                座位的类型
                 String keySuffix = StrUtil.join("_", each.getTrainId(), item.getDeparture(), item.getArrival());
+//                键值：1——北京南——杭州东
                 Object quantityObj = stringRedisTemplate.opsForHash().get(TRAIN_STATION_REMAINING_TICKET + keySuffix, seatType);
+//                index12306-ticket-service:train_station_remaining_ticket:1——北京南——杭州东：座位类型
                 int quantity = Optional.ofNullable(quantityObj)
                         .map(Object::toString)
                         .map(Integer::parseInt)
                         .orElseGet(() -> {
                             Map<String, String> seatMarginMap = seatMarginCacheLoader.load(String.valueOf(each.getTrainId()), seatType, item.getDeparture(), item.getArrival());
+
                             return Optional.ofNullable(seatMarginMap.get(String.valueOf(item.getSeatType()))).map(Integer::parseInt).orElse(0);
+//                          这里返回的就是我们的当前的车此次的车票的类型的信息；
                         });
+//                根据车次+起始站点+种植站点+车票类型确定每个车次的不同价格档次的票的数量
                 seatClassList.add(new SeatClassDTO(item.getSeatType(), quantity, new BigDecimal(item.getPrice()).divide(new BigDecimal("100"), 1, RoundingMode.HALF_UP), false));
             });
             each.setSeatClassList(seatClassList);
         }
+//        遍历每一个车次完成对应的车票的车次的座位余票的缓存和读取
+//        最终返回查询的列表  车次/车座/当前的车次的细节的信息/当前的车次中车座的数目
         return TicketPageQueryRespDTO.builder()
                 .trainList(seatResults)
                 .departureStationList(buildDepartureStationList(seatResults))
@@ -373,7 +405,10 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
 
     @Override
     public TicketPurchaseRespDTO purchaseTicketsV2(PurchaseTicketReqDTO requestParam) {
+//       当前的这个参数的请求包含：
+//        列车的ID  乘车人  选择的坐席的类型 出发和终止的车站 最后到达的车站
         // 责任链模式，验证 1：参数必填 2：参数正确性 3：乘客是否已买当前车次等...
+//      通过责任链的方式实现对我们的当前的下单的请求的一个条件的过滤
         purchaseTicketAbstractChainContext.handler(TicketChainMarkEnum.TRAIN_PURCHASE_TICKET_FILTER.name(), requestParam);
         // 为什么需要令牌限流？余票缓存限流不可以么？详情查看：https://nageoffer.com/12306/question
         TokenResultDTO tokenResult = ticketAvailabilityTokenBucket.takeTokenFromBucket(requestParam);
@@ -390,13 +425,19 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
             }
             throw new ServiceException("列车站点已无余票");
         }
+
         // v1 版本购票存在 4 个较为严重的问题，v2 版本相比较 v1 版本更具有业务特点以及性能，整体提升较大
         // 写了详细的 v2 版本购票升级指南，详情查看：https://nageoffer.com/12306/question
+
+        /*
+        定义一个本地锁和分布式锁的列表
+         */
         List<ReentrantLock> localLockList = new ArrayList<>();
         List<RLock> distributedLockList = new ArrayList<>();
         Map<Integer, List<PurchaseTicketPassengerDetailDTO>> seatTypeMap = requestParam.getPassengers().stream()
                 .collect(Collectors.groupingBy(PurchaseTicketPassengerDetailDTO::getSeatType));
         seatTypeMap.forEach((searType, count) -> {
+//           对当前的列车的座位的类型的进行上锁，细化锁的粒度
             String lockKey = environment.resolvePlaceholders(String.format(LOCK_PURCHASE_TICKETS_V2, requestParam.getTrainId(), searType));
             ReentrantLock localLock = localLockMap.getIfPresent(lockKey);
             if (localLock == null) {
@@ -411,9 +452,14 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
             RLock distributedLock = redissonClient.getFairLock(lockKey);
             distributedLockList.add(distributedLock);
         });
+//        针对当前垢面的所有类型的车票和对应的票数进行锁的获取，分别获取到对应类型个数的本地锁和分布式锁
         try {
+//         当我们需要同时下单多张票的时候，比如不同i类型的多张票的时候，我们需要分别对每一个类型的票进行加锁的操作
+//            这里先让其进行本地锁的轮询获取，只有拿到当前的下单的票的所有的锁，才能完成对当前的订票的部分的功能
             localLockList.forEach(ReentrantLock::lock);
+//            先拿到对应的本地锁，然后在让其去获取对饮的分布式锁的
             distributedLockList.forEach(RLock::lock);
+
             return ticketService.executePurchaseTickets(requestParam);
         } finally {
             localLockList.forEach(localLock -> {
@@ -443,7 +489,9 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
                 () -> trainMapper.selectById(trainId),
                 ADVANCE_TICKET_DAY,
                 TimeUnit.DAYS);
+//        拿到当前的列车的实体去进行选座位,确定当前的座位被锁定
         List<TrainPurchaseTicketRespDTO> trainPurchaseTicketResults = trainSeatTypeSelector.select(trainDO.getTrainType(), requestParam);
+//
         List<TicketDO> ticketDOList = trainPurchaseTicketResults.stream()
                 .map(each -> TicketDO.builder()
                         .username(UserContext.getUsername())
@@ -454,6 +502,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
                         .ticketStatus(TicketStatusEnum.UNPAID.getCode())
                         .build())
                 .toList();
+//        更新车票表,此时车票表中的车票的状态为未支付
         saveBatch(ticketDOList);
         Result<String> ticketOrderResult;
         try {

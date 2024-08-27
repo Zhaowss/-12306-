@@ -161,7 +161,9 @@ public class UserLoginServiceImpl implements UserLoginService {
     @Transactional(rollbackFor = Exception.class)
     @Override
     public UserRegisterRespDTO register(UserRegisterReqDTO requestParam) {
+//        使用责任链模式构建的用户校验责任链
         abstractChainContext.handler(UserChainMarkEnum.USER_REGISTER_FILTER.name(), requestParam);
+//        校验通过之后进行锁获取
         RLock lock = redissonClient.getLock(LOCK_USER_REGISTER + requestParam.getUsername());
         boolean tryLock = lock.tryLock();
         if (!tryLock) {
@@ -249,6 +251,9 @@ public class UserLoginServiceImpl implements UserLoginService {
             distributedCache.delete(UserContext.getToken());
             userReuseMapper.insert(new UserReuseDO(username));
             StringRedisTemplate instance = (StringRedisTemplate) distributedCache.getInstance();
+//            此处为了防止大量的删除导致的Redis出现的大key的问题
+//            除了设置TTL之外
+//            我们在此处设计了一个 哈希的处理,将其映射到1024个对应的哈希set中
             instance.opsForSet().add(USER_REGISTER_REUSE_SHARDING + hashShardingIdx(username), username);
         } finally {
             lock.unlock();
